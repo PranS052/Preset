@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TOGETHER — Preset 01 · Panchabhūta</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,500;1,300;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg-frame: #0b0b0d;
+    --ui-text: #e9e6df;
+    --ui-muted: #a5a196;
+    --accent: #b08d57;
+    --accent-active: #d9b779;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg-frame);
+    color: var(--ui-text);
+    font-family: 'JetBrains Mono', monospace;
+    overflow: hidden;
+  }
+
+  .stage { position: relative; width: 100vw; height: 100dvh; overflow: hidden; }
+
+  canvas.layer {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0;
+    transition: opacity 1.3s ease;
+  }
+  canvas.layer.visible { opacity: 1; }
+
+  .scrim-bottom {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 40%;
+    background: linear-gradient(to top, rgba(6,6,7,0.78), rgba(6,6,7,0));
+    pointer-events: none; z-index: 4;
+  }
+
+  .topbar {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 20px 24px;
+  }
+  .wordmark { font-family: 'Fraunces', serif; font-size: 15px; letter-spacing: 0.04em; font-weight: 500; }
+  .subtitle { font-size: 11px; color: var(--ui-muted); margin-top: 3px; }
+
+  .settings-toggle {
+    background: none; border: 1px solid rgba(233,230,223,0.25); color: var(--ui-text);
+    border-radius: 50%; width: 34px; height: 34px; cursor: pointer; font-size: 14px;
+    transition: border-color .2s ease;
+  }
+  .settings-toggle:hover { border-color: var(--accent); }
+  .settings-toggle:focus-visible { outline: 2px solid var(--accent-active); outline-offset: 3px; }
+
+  .element-label { position: absolute; left: 28px; bottom: 118px; z-index: 5; max-width: 70vw; }
+  .element-name {
+    font-family: 'Fraunces', serif; font-style: italic; font-weight: 300;
+    font-size: clamp(30px, 6vw, 62px); line-height: 1; transition: opacity .3s ease;
+  }
+  .element-name.fading { opacity: 0; }
+  .element-hint { font-size: 11px; color: var(--ui-muted); margin-top: 8px; }
+
+  .gauge {
+    position: absolute; right: 26px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column-reverse; gap: 8px; z-index: 5;
+  }
+  .gauge-seg {
+    width: 9px; height: 26px; border-radius: 2px;
+    background: rgba(233,230,223,0.10); border: 1px solid rgba(233,230,223,0.2);
+    transition: background .4s ease, border-color .4s ease;
+  }
+  .gauge-seg.filled { background: var(--accent-active); border-color: var(--accent-active); }
+
+  .controls {
+    position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 20px; z-index: 5;
+  }
+
+  .scan-btn {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; letter-spacing: 0.02em;
+    background: #141416; color: var(--ui-text); border: 1px solid rgba(233,230,223,0.25);
+    padding: 14px 22px; border-radius: 8px; cursor: pointer;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 6px 14px rgba(0,0,0,0.35);
+    transition: transform .08s ease, border-color .2s ease, box-shadow .2s ease, opacity .2s ease;
+  }
+  .scan-btn:hover:not(:disabled) { border-color: var(--accent); }
+  .scan-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset, 0 2px 6px rgba(0,0,0,0.3); }
+  .scan-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .scan-btn:focus-visible { outline: 2px solid var(--accent-active); outline-offset: 3px; }
+
+  .count-readout { font-size: 20px; min-width: 62px; text-align: center; }
+  .count-readout .max { color: var(--ui-muted); }
+
+  .settings-panel {
+    position: absolute; top: 0; right: 0; height: 100%; width: min(320px, 86vw);
+    background: #101012; border-left: 1px solid rgba(233,230,223,0.12);
+    transform: translateX(100%); transition: transform .3s ease; z-index: 10;
+    padding: 24px 20px; overflow-y: auto;
+  }
+  .settings-panel.open { transform: translateX(0); }
+  .settings-panel h2 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 18px; margin: 0 0 4px; }
+  .settings-panel p.note { font-size: 11px; color: var(--ui-muted); line-height: 1.5; margin: 0 0 18px; }
+  .track-row { border-top: 1px solid rgba(233,230,223,0.08); padding: 12px 0; }
+  .track-row label { display: block; font-size: 12px; margin-bottom: 6px; }
+  .track-row input[type=file] {
+    font-size: 10px; color: var(--ui-muted); max-width: 100%;
+  }
+  .track-status { font-size: 10px; color: var(--accent); margin-top: 5px; }
+  .close-panel {
+    position: absolute; top: 18px; right: 18px; background: none; border: none;
+    color: var(--ui-muted); font-size: 16px; cursor: pointer;
+  }
+  .close-panel:focus-visible { outline: 2px solid var(--accent-active); outline-offset: 3px; }
+
+  .start-overlay {
+    position: absolute; inset: 0; z-index: 20; background: var(--bg-frame);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    text-align: center; padding: 24px;
+    transition: opacity .5s ease, visibility .5s ease;
+  }
+  .start-overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  .start-overlay .wordmark { font-size: 20px; }
+  .start-overlay .subtitle { margin-bottom: 8px; }
+  .start-caption { font-size: 11px; color: var(--ui-muted); max-width: 320px; line-height: 1.6; }
+
+  @media (prefers-reduced-motion: reduce) {
+    canvas.layer, .element-name, .start-overlay { transition-duration: .01s; }
+  }
+
+  @media (max-width: 480px) {
+    .controls { gap: 10px; }
+    .scan-btn { padding: 12px 15px; font-size: 12px; }
+    .element-label { left: 18px; bottom: 130px; }
+    .gauge { right: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <canvas class="layer visible" id="layerA"></canvas>
+  <canvas class="layer" id="layerB"></canvas>
+  <div class="scrim-bottom"></div>
+
+  <div class="topbar">
+    <div>
+      <div class="wordmark">together</div>
+      <div class="subtitle">preset 01 · panchabhūta</div>
+    </div>
+    <button class="settings-toggle" id="settingsToggle" aria-label="Open track settings">⚙</button>
+  </div>
+
+  <div class="element-label">
+    <div class="element-name" id="elementName">ambient</div>
+    <div class="element-hint" id="elementHint">0 participants present</div>
+  </div>
+
+  <div class="gauge" id="gauge" aria-hidden="true"></div>
+
+  <div class="controls">
+    <button class="scan-btn" id="exitBtn" disabled>Exit</button>
+    <div class="count-readout"><span id="countNum">0</span><span class="max"> / 5</span></div>
+    <button class="scan-btn" id="enterBtn">Enter</button>
+  </div>
+
+  <aside class="settings-panel" id="settingsPanel" aria-hidden="true">
+    <button class="close-panel" id="closePanel" aria-label="Close settings">✕</button>
+    <h2>Tracks</h2>
+    <p class="note">Each slot plays a synthesised placeholder tone until you load a real file. Uploaded audio stays in this browser tab only — nothing is sent anywhere.</p>
+    <div id="trackList"></div>
+    <button class="scan-btn" id="resetBtn" style="margin-top: 18px; width: 100%;">Reset to ambient</button>
+  </aside>
+
+  <div class="start-overlay" id="startOverlay">
+    <div class="wordmark">together</div>
+    <div class="subtitle">preset 01 · panchabhūta</div>
+    <button class="scan-btn" id="startBtn">Begin experience</button>
+    <p class="start-caption">Click to switch on the ambient state, then use Enter / Exit to simulate participants scanning in and out (max 5).</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- configuration: one entry per count level, index 0 = ambient (no participants) ----------
+  var ELEMENTS = [
+    { key: 'ambient', name: 'ambient', bg: ['#0a0a0f', '#101018'], colors: ['#3a3a4a', '#55555f'], style: 'drift',   count: 24,  speed: 0.3, trim: 0.35, synth: { waveform: 'sine',     freqs: [110],                  lfo: 0.12 } },
+    { key: 'earth',   name: 'earth',   bg: ['#2b1d0e', '#4a3418'], colors: ['#8a5a2b', '#c98a4b', '#5c3d1a'], style: 'fall',   count: 70,  speed: 0.6, trim: 0.55, synth: { waveform: 'triangle', freqs: [65.41, 98.0],          lfo: 0.18 } },
+    { key: 'water',   name: 'water',   bg: ['#031c2b', '#0a3d5c'], colors: ['#4fc3f7', '#0288d1', '#b3e5fc'], style: 'flow',   count: 90,  speed: 1.0, trim: 0.55, synth: { waveform: 'sine',     freqs: [220, 329.63],          lfo: 0.25 } },
+    { key: 'fire',    name: 'fire',    bg: ['#1a0800', '#3d1200'], colors: ['#ff6d00', '#ff3d00', '#ffab40'], style: 'rise',   count: 100, speed: 1.4, trim: 0.55, synth: { waveform: 'sawtooth', freqs: [146.83, 220.0, 293.66], lfo: 0.4  } },
+    { key: 'air',     name: 'air',     bg: ['#1c2b33', '#3a4d57'], colors: ['#eceff1', '#b0bec5', '#ffffff'], style: 'swirl',  count: 80,  speed: 1.8, trim: 0.5,  synth: { waveform: 'triangle', freqs: [440, 659.25],          lfo: 0.5  } },
+    { key: 'space',   name: 'space',   bg: ['#000000', '#0d0221'], colors: ['#ffffff', '#b39ddb', '#7c4dff'], style: 'twinkle',count: 160, speed: 0.3, trim: 0.55, synth: { waveform: 'sine',     freqs: [110, 164.81, 220],     lfo: 0.08 } }
+  ];
+  var ELEMENTS_BY_KEY = {};
+  ELEMENTS.forEach(function (e) { ELEMENTS_BY_KEY[e.key] = e; });
+
+  var MAX = 5;
+  var CROSSFADE_SECONDS = 1.3;
+  var count = 0;
+
+  // ---------- small helpers ----------
+  function rand(min, max) { return min + Math.random() * (max - min); }
+
+  function hexToRgba(hex, alpha) {
+    var h = hex.replace('#', '');
+    var r = parseInt(h.substring(0, 2), 16);
+    var g = parseInt(h.substring(2, 4), 16);
+    var b = parseInt(h.substring(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+  }
+
+  var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- particle engine ----------
+  function makeParticle(style, w, h, config) {
+    var color = config.colors[Math.floor(Math.random() * config.colors.length)];
+    switch (style) {
+      case 'fall':
+        return { x: rand(0, w), y: rand(-h, 0), vy: rand(0.3, 0.8) * config.speed, sway: rand(0.3, 1.2), phase: rand(0, Math.PI * 2), size: rand(1.5, 3.5), color: color, alpha: rand(0.4, 0.9) };
+      case 'flow':
+        return { x: rand(0, w), baseY: rand(h * 0.2, h * 0.9), amp: rand(6, 22), freq: rand(0.008, 0.02), phase: rand(0, Math.PI * 2), vx: rand(0.4, 1.1) * config.speed, size: rand(1.5, 3), color: color, alpha: rand(0.35, 0.8) };
+      case 'rise':
+        return { x: rand(0, w), y: rand(h * 0.4, h + 20), vy: -rand(0.5, 1.4) * config.speed, size: rand(1.5, 4), color: color, alpha: rand(0.5, 1), flicker: rand(0.008, 0.02) };
+      case 'swirl':
+        return { angle: rand(0, Math.PI * 2), radius: rand(20, Math.min(w, h) * 0.4), cx: w / 2 + rand(-40, 40), cy: h / 2 + rand(-40, 40), speed: rand(0.004, 0.012) * config.speed, size: rand(1.5, 3), color: color, alpha: rand(0.4, 0.85), driftPhase: rand(0, Math.PI * 2) };
+      case 'twinkle':
+        return { x: rand(0, w), y: rand(0, h), size: rand(0.8, 2.4), color: color, baseAlpha: rand(0.25, 0.9), freq: rand(0.3, 1.2) * config.speed, phase: rand(0, Math.PI * 2) };
+      case 'drift':
+      default:
+        return { x: rand(0, w), y: rand(0, h), vx: rand(-0.15, 0.15), vy: rand(-0.1, 0.1), size: rand(1, 2.2), color: color, baseAlpha: rand(0.15, 0.4), freq: rand(0.2, 0.5), phase: rand(0, Math.PI * 2) };
+    }
+  }
+
+  function updateAndDraw(ctx, p, style, w, h, t) {
+    var x, y, alpha;
+    switch (style) {
+      case 'fall':
+        p.y += p.vy;
+        p.x += Math.sin(t * 0.001 + p.phase) * p.sway * 0.05;
+        if (p.y > h + 10) { p.y = -10; p.x = rand(0, w); }
+        ctx.fillStyle = hexToRgba(p.color, p.alpha);
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+        break;
+      case 'flow':
+        p.x += p.vx;
+        if (p.x > w + 10) p.x = -10;
+        y = p.baseY + Math.sin(p.x * p.freq + p.phase) * p.amp;
+        ctx.fillStyle = hexToRgba(p.color, p.alpha);
+        ctx.beginPath(); ctx.arc(p.x, y, p.size, 0, Math.PI * 2); ctx.fill();
+        break;
+      case 'rise':
+        p.y += p.vy;
+        p.x += Math.sin(t * 0.002 + p.y * 0.05) * 0.4;
+        p.alpha -= p.flicker;
+        if (p.y < -10 || p.alpha <= 0) { p.y = h + rand(0, 40); p.x = rand(0, w); p.alpha = rand(0.5, 1); }
+        ctx.fillStyle = hexToRgba(p.color, Math.max(p.alpha, 0));
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+        break;
+      case 'swirl':
+        p.angle += p.speed;
+        p.cx += Math.sin(t * 0.0003 + p.driftPhase) * 0.05;
+        x = p.cx + Math.cos(p.angle) * p.radius;
+        y = p.cy + Math.sin(p.angle) * p.radius * 0.6;
+        ctx.fillStyle = hexToRgba(p.color, p.alpha);
+        ctx.beginPath(); ctx.arc(x, y, p.size, 0, Math.PI * 2); ctx.fill();
+        break;
+      case 'twinkle':
+        alpha = p.baseAlpha * (0.5 + 0.5 * Math.sin(t * 0.001 * p.freq + p.phase));
+        ctx.fillStyle = hexToRgba(p.color, alpha);
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+        break;
+      case 'drift':
+      default:
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < 0) p.x = w; if (p.x > w) p.x = 0;
+        if (p.y < 0) p.y = h; if (p.y > h) p.y = 0;
+        alpha = p.baseAlpha * (0.6 + 0.4 * Math.sin(t * 0.001 * p.freq + p.phase));
+        ctx.fillStyle = hexToRgba(p.color, alpha);
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+        break;
+    }
+  }
+
+  // ---------- canvas layers (two, cross-faded via CSS opacity) ----------
+  var layerA = document.getElementById('layerA');
+  var layerB = document.getElementById('layerB');
+  var front = layerA, back = layerB;
+
+  function sizeCanvas(canvas) {
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    canvas.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  [layerA, layerB].forEach(sizeCanvas);
+  window.addEventListener('resize', function () { [layerA, layerB].forEach(sizeCanvas); });
+
+  function initLayer(canvas, elementKey) {
+    var config = ELEMENTS_BY_KEY[elementKey];
+    canvas.dataset.key = elementKey;
+    var w = window.innerWidth, h = window.innerHeight;
+    canvas._particles = [];
+    for (var i = 0; i < config.count; i++) canvas._particles.push(makeParticle(config.style, w, h, config));
+  }
+
+  function drawLayer(canvas, t) {
+    var config = ELEMENTS_BY_KEY[canvas.dataset.key];
+    var ctx = canvas.getContext('2d');
+    var w = window.innerWidth, h = window.innerHeight;
+    var grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, config.bg[0]);
+    grad.addColorStop(1, config.bg[1]);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+    canvas._particles.forEach(function (p) { updateAndDraw(ctx, p, config.style, w, h, t); });
+  }
+
+  initLayer(layerA, 'ambient');
+  initLayer(layerB, 'ambient');
+  drawLayer(layerA, 0);
+  drawLayer(layerB, 0);
+
+  function loop(t) {
+    drawLayer(front, t);
+    drawLayer(back, t);
+    if (!reducedMotion) requestAnimationFrame(loop);
+  }
+  if (!reducedMotion) requestAnimationFrame(loop);
+
+  var enterBtn = document.getElementById('enterBtn');
+  var exitBtn = document.getElementById('exitBtn');
+  var countNum = document.getElementById('countNum');
+  var elementNameEl = document.getElementById('elementName');
+  var elementHintEl = document.getElementById('elementHint');
+
+  function updateElementLabel(key) {
+    elementNameEl.classList.add('fading');
+    setTimeout(function () {
+      elementNameEl.textContent = ELEMENTS_BY_KEY[key].name;
+      elementNameEl.classList.remove('fading');
+    }, 300);
+  }
+
+  function crossfadeTo(newKey) {
+    enterBtn.disabled = true; exitBtn.disabled = true;
+    initLayer(back, newKey);
+    drawLayer(back, performance.now());
+    requestAnimationFrame(function () {
+      back.classList.add('visible');
+      front.classList.remove('visible');
+    });
+    updateElementLabel(newKey);
+    setTimeout(function () {
+      var temp = front; front = back; back = temp;
+      enterBtn.disabled = count >= MAX;
+      exitBtn.disabled = count <= 0;
+    }, CROSSFADE_SECONDS * 1000 + 50);
+  }
+
+  // ---------- gauge ----------
+  var gaugeEl = document.getElementById('gauge');
+  for (var gi = 1; gi <= MAX; gi++) {
+    var seg = document.createElement('div');
+    seg.className = 'gauge-seg';
+    seg.dataset.idx = gi;
+    gaugeEl.appendChild(seg);
+  }
+  function updateGauge(n) {
+    Array.prototype.forEach.call(gaugeEl.children, function (segEl) {
+      segEl.classList.toggle('filled', Number(segEl.dataset.idx) <= n);
+    });
+  }
+
+  // ---------- audio engine ----------
+  var audioCtx = null, masterGain = null, slots = [];
+
+  function ensureAudio() {
+    if (audioCtx) { if (audioCtx.state === 'suspended') audioCtx.resume(); return; }
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.9;
+    masterGain.connect(audioCtx.destination);
+    slots = ELEMENTS.map(buildSynthSlot);
+    setActive(0, true);
+  }
+
+  function buildSynthSlot(config) {
+    var gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0;
+    gainNode.connect(masterGain);
+
+    var voiceGain = audioCtx.createGain();
+    voiceGain.gain.value = 1;
+    voiceGain.connect(gainNode);
+
+    var oscillators = config.synth.freqs.map(function (freq) {
+      var osc = audioCtx.createOscillator();
+      osc.type = config.synth.waveform;
+      osc.frequency.value = freq;
+      var oGain = audioCtx.createGain();
+      oGain.gain.value = 1 / config.synth.freqs.length;
+      osc.connect(oGain);
+      oGain.connect(voiceGain);
+      osc.start();
+      return osc;
+    });
+
+    var lfo = audioCtx.createOscillator();
+    lfo.frequency.value = config.synth.lfo;
+    var lfoDepth = audioCtx.createGain();
+    lfoDepth.gain.value = 0.15;
+    lfo.connect(lfoDepth);
+    lfoDepth.connect(voiceGain.gain);
+    lfo.start();
+
+    return { key: config.key, gainNode: gainNode, voiceGain: voiceGain, oscillators: oscillators, lfo: lfo, trim: config.trim, kind: 'synth', audioEl: null };
+  }
+
+  function setActive(index, immediate) {
+    if (!audioCtx) return;
+    var now = audioCtx.currentTime;
+    slots.forEach(function (slot, i) {
+      var target = (i === index) ? slot.trim : 0;
+      slot.gainNode.gain.cancelScheduledValues(now);
+      slot.gainNode.gain.setValueAtTime(slot.gainNode.gain.value, now);
+      if (immediate) slot.gainNode.gain.setValueAtTime(target, now);
+      else slot.gainNode.gain.linearRampToValueAtTime(target, now + CROSSFADE_SECONDS);
+    });
+  }
+
+  function handleFileUpload(index, file) {
+    ensureAudio();
+    var slot = slots[index];
+    slot.oscillators.forEach(function (o) { try { o.stop(); } catch (e) {} });
+    try { slot.lfo.stop(); } catch (e) {}
+    slot.voiceGain.disconnect();
+    var audioEl = new Audio(URL.createObjectURL(file));
+    audioEl.loop = true;
+    var source = audioCtx.createMediaElementSource(audioEl);
+    source.connect(slot.gainNode);
+    audioEl.play().catch(function () {});
+    slot.kind = 'file';
+    slot.audioEl = audioEl;
+    document.getElementById('status-' + index).textContent = file.name;
+  }
+
+  // ---------- settings panel: one row per slot ----------
+  var trackList = document.getElementById('trackList');
+  ELEMENTS.forEach(function (config, i) {
+    var row = document.createElement('div');
+    row.className = 'track-row';
+    var label = document.createElement('label');
+    label.textContent = (i === 0 ? 'Ambient (count 0)' : config.name.charAt(0).toUpperCase() + config.name.slice(1) + ' (count ' + i + ')');
+    var input = document.createElement('input');
+    input.type = 'file'; input.accept = 'audio/*';
+    input.addEventListener('change', function (e) { if (e.target.files[0]) handleFileUpload(i, e.target.files[0]); });
+    var status = document.createElement('div');
+    status.className = 'track-status'; status.id = 'status-' + i; status.textContent = 'Synth tone';
+    row.appendChild(label); row.appendChild(input); row.appendChild(status);
+    trackList.appendChild(row);
+  });
+
+  var settingsPanel = document.getElementById('settingsPanel');
+  document.getElementById('settingsToggle').addEventListener('click', function () {
+    settingsPanel.classList.add('open'); settingsPanel.setAttribute('aria-hidden', 'false');
+  });
+  document.getElementById('closePanel').addEventListener('click', function () {
+    settingsPanel.classList.remove('open'); settingsPanel.setAttribute('aria-hidden', 'true');
+  });
+  document.getElementById('resetBtn').addEventListener('click', function () {
+    count = 0; refresh();
+  });
+
+  // ---------- entry / exit (stand-in for the QR scan-in / scan-out logic) ----------
+  function refresh() {
+    countNum.textContent = count;
+    elementHintEl.textContent = count + (count === 1 ? ' participant present' : ' participants present');
+    updateGauge(count);
+    setActive(count, false);
+    crossfadeTo(ELEMENTS[count].key);
+  }
+
+  enterBtn.addEventListener('click', function () {
+    ensureAudio();
+    if (count < MAX) { count++; refresh(); }
+  });
+  exitBtn.addEventListener('click', function () {
+    ensureAudio();
+    if (count > 0) { count--; refresh(); }
+  });
+
+  updateGauge(0);
+
+  document.getElementById('startBtn').addEventListener('click', function () {
+    ensureAudio();
+    document.getElementById('startOverlay').classList.add('hidden');
+  });
+})();
+</script>
+</body>
+</html>
